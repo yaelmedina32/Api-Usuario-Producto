@@ -13,8 +13,9 @@ const db = new sqlite3.Database('src/configuracion/database.db', sqlite3.OPEN_RE
 });
 
 rutas.get('/products', verificarToken, async(req, res) => {
-    const consulta = `select * from producto`;
-    db.all(consulta, [], (err, rows) => {
+    const lastToken = req.headers.token;
+    const consulta = `select * from producto where userId = (select id from usuarios where lastToken = ?)`;
+    db.all(consulta, [lastToken], (err, rows) => {
         if(err){
             console.error(err.message);
             return res.status(500).json({message: 'Error al obtener los productos', error: err});
