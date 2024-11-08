@@ -18,9 +18,9 @@ rutas.get('/products', verificarToken, async(req, res) => {
     db.all(consulta, [lastToken], (err, rows) => {
         if(err){
             console.error(err.message);
-            return res.status(500).json({message: 'Error al obtener los productos', error: err});
+            return res.status(500).send({message: 'Error al obtener los productos', error: err});
         }
-        return res.status(200).json(rows);
+        return res.status(200).send(rows);
     });
 });
 
@@ -32,16 +32,16 @@ rutas.post('/products', verificarToken, async(req, res) => {
     const lastToken = req.headers.token;
     //Primero valido que haya datos dentor del nombre, descripción y precio
     if(!name || !description || !price){
-        return res.status(400).json({message: `Faltan los siguientes datos: `
+        return res.status(400).send({message: `Faltan los siguientes datos: `
         + `${!name ? 'Nombre ' : ''} ${!description ? 'Descripción' : ''} ${!price ? 'Precio ' : ''}`});
     }
     //Luego, valido que el tipo de dato del precio sea un número
     if(typeof price !== 'number'){
-        return res.status(400).json({message: 'El precio debe ser un número'});
+        return res.status(400).send({message: 'El precio debe ser un número'});
     };
     //Finalmente, checo que sea un número positivo
     if(price < 0){
-        return res.status(400).json({message: 'El precio no puede ser negativo'});
+        return res.status(400).send({message: 'El precio no puede ser negativo'});
     };
     //Como no se indica que se pase el id del usuario, lo que hice fue sacar el lastToken guardado dentro de la tabla de usuarios
     //para sacar el id del usuario que se autenticó con el token actual pasado desde el header
@@ -49,7 +49,7 @@ rutas.post('/products', verificarToken, async(req, res) => {
     db.get(sql, [lastToken], (err, row) => {
         if(err){
             console.error(err.message);
-            return res.status(500).json({message: 'Error al obtener el usuario'});
+            return res.status(500).send({message: 'Error al obtener el usuario'});
         }
         //Luego checo que este usuario no tenga productos duplicados con el mismo nombre
         const userId = row.id
@@ -92,20 +92,20 @@ rutas.put('/products/:id', verificarToken, async(req, res) => {
     const lastToken = req.headers.token;
 
     if(!name || !description || !price){
-        return res.status(400).json({message: `Faltan los siguientes datos: `
+        return res.status(400).send({message: `Faltan los siguientes datos: `
         + `${!name ? 'Nombre ' : ''} ${!description ? 'Descripción' : ''} ${!price ? 'Precio ' : ''}`});
     }
 
     if(typeof price !== 'number'){
-        return res.status(400).json({message: 'El precio debe ser un número'});
+        return res.status(400).send({message: 'El precio debe ser un número'});
     };
 
     if(price < 0){
-        return res.status(400).json({message: 'El precio no puede ser negativo'});
+        return res.status(400).send({message: 'El precio no puede ser negativo'});
     };
     if(isNaN(id)){
         console.log(typeof id);
-        return res.status(400).json({message: 'El id del producto debe ser entero'});
+        return res.status(400).send({message: 'El id del producto debe ser entero'});
     }
     let sql = `select *, (select id from usuarios where lastToken = ?) usuarioActual
     from producto 
