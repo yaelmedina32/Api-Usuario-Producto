@@ -17,7 +17,7 @@ rutas.get('/products', verificarToken, async(req, res) => {
     db.all(consulta, [], (err, rows) => {
         if(err){
             console.error(err.message);
-            return res.status(500).json({mensaje: 'Error al obtener los productos'});
+            return res.status(500).json({message: 'Error al obtener los productos', error: err});
         }
         return res.status(200).json(rows);
     });
@@ -31,16 +31,16 @@ rutas.post('/products', verificarToken, async(req, res) => {
     const lastToken = req.headers.token;
     //Primero valido que haya datos dentor del nombre, descripción y precio
     if(!name || !description || !price){
-        return res.status(400).json({mensaje: `Faltan los siguientes datos: `
+        return res.status(400).json({message: `Faltan los siguientes datos: `
         + `${!name ? 'Nombre ' : ''} ${!description ? 'Descripción' : ''} ${!price ? 'Precio ' : ''}`});
     }
     //Luego, valido que el tipo de dato del precio sea un número
     if(typeof price !== 'number'){
-        return res.status(400).json({mensaje: 'El precio debe ser un número'});
+        return res.status(400).json({message: 'El precio debe ser un número'});
     };
     //Finalmente, checo que sea un número positivo
     if(price < 0){
-        return res.status(400).json({mensaje: 'El precio no puede ser negativo'});
+        return res.status(400).json({message: 'El precio no puede ser negativo'});
     };
     //Como no se indica que se pase el id del usuario, lo que hice fue sacar el lastToken guardado dentro de la tabla de usuarios
     //para sacar el id del usuario que se autenticó con el token actual pasado desde el header
@@ -48,7 +48,7 @@ rutas.post('/products', verificarToken, async(req, res) => {
     db.get(sql, [lastToken], (err, row) => {
         if(err){
             console.error(err.message);
-            return res.status(500).json({mensaje: 'Error al obtener el usuario'});
+            return res.status(500).json({message: 'Error al obtener el usuario'});
         }
         //Luego checo que este usuario no tenga productos duplicados con el mismo nombre
         const userId = row.id
@@ -58,24 +58,24 @@ rutas.post('/products', verificarToken, async(req, res) => {
         db.all(sql, [name, userId], (err, rows) => {
             if(err){
                 console.error(err.message);
-                return res.status(500).send({mensaje: 'Error al obtener el producto', error: err});
+                return res.status(500).send({message: 'Error al obtener el producto', error: err});
             }
             if(rows.length > 0){
-                return res.status(400).send({mensaje: `Ya existe un producto con ese nombre asignado`});
+                return res.status(400).send({message: `Ya existe un producto con ese nombre asignado`});
             }
             sql = `insert into producto (name, description, price, userId, updatedAt) values (?, ?, ?, ?, datetime('now'))`;
                 db.run(sql, [name, description, price, userId], (err) => {
                     if(err){
                         console.error(err.message);
-                        return res.status(500).send({mensaje: 'Error al insertar el producto'});
+                        return res.status(500).send({message: 'Error al insertar el producto'});
                     }
                     //Una vez insertado, lo selecciono con el nombre y el usuarioId loggeado
                     sql = `select * from producto where name = ? and userId = ?`;
                     db.get(sql, [name, userId], (err, row) => {
                         if(err){
-                            return res.status(500).send({mensaje: "Error al obtener el producto", error: err});
+                            return res.status(500).send({message: "Error al obtener el producto", error: err});
                         }
-                        return res.status(200).send({mensaje: 'Producto creado con éxito', productId: row.id});
+                        return res.status(200).send({message: 'Producto creado con éxito', productId: row.id});
                     })
                 });
         });
@@ -91,20 +91,20 @@ rutas.put('/products/:id', verificarToken, async(req, res) => {
     const lastToken = req.headers.token;
 
     if(!name || !description || !price){
-        return res.status(400).json({mensaje: `Faltan los siguientes datos: `
+        return res.status(400).json({message: `Faltan los siguientes datos: `
         + `${!name ? 'Nombre ' : ''} ${!description ? 'Descripción' : ''} ${!price ? 'Precio ' : ''}`});
     }
 
     if(typeof price !== 'number'){
-        return res.status(400).json({mensaje: 'El precio debe ser un número'});
+        return res.status(400).json({message: 'El precio debe ser un número'});
     };
 
     if(price < 0){
-        return res.status(400).json({mensaje: 'El precio no puede ser negativo'});
+        return res.status(400).json({message: 'El precio no puede ser negativo'});
     };
     if(isNaN(id)){
         console.log(typeof id);
-        return res.status(400).json({mensaje: 'El id del producto debe ser entero'});
+        return res.status(400).json({message: 'El id del producto debe ser entero'});
     }
     let sql = `select *, (select id from usuarios where lastToken = ?) usuarioActual
     from producto 
@@ -112,10 +112,10 @@ rutas.put('/products/:id', verificarToken, async(req, res) => {
     db.get(sql, [lastToken, id], (err, row) => {
         if(err){
             console.error(err.message);
-            return res.status(500).send({mensaje: 'Error al obtener el producto'});
+            return res.status(500).send({message: 'Error al obtener el producto', error: err});
         }
         if(!row){
-            return res.status(400).send({mensaje: 'No se encontró el producto'});
+            return res.status(400).send({message: 'No se encontró el producto'});
         }
         if(row.userId != row.usuarioActual){
             return res.status(400).send({message: "El producto seleccionado no pertenece al usuario actual"})
@@ -124,9 +124,9 @@ rutas.put('/products/:id', verificarToken, async(req, res) => {
         db.run(sql, [name, description, price, id], (err) => {
             if(err){
                 console.error(err.message);
-                return res.status(500).send({mensaje: 'Error al actualizar el producto'});
+                return res.status(500).send({message: 'Error al actualizar el producto'});
             }
-            return res.status(200).send({mensaje: 'Producto actualizado con éxito'});
+            return res.status(200).send({message: 'Producto actualizado con éxito'});
         });
     });
 });
@@ -143,7 +143,6 @@ rutas.delete('/products/:id', verificarToken, (req,res) => {
     let sql = `select *, (select id from usuarios where lastToken = ?) as usuarioActual 
     from producto where id = ?`;
     db.get(sql, [lastToken, id], (err, row) => {
-        console.log(sql);
         if(err){
             return res.status(500).send({message: "Error al validar la consulta", error: err});
         }

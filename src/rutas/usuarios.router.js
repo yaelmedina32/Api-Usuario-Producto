@@ -152,24 +152,44 @@ rutas.post('/register', verificarEmail, async(req, res) => {
 });
 
 //Actualizar usuario
-rutas.put('/users', verificarToken, verificarEmail, (req,res) => {
+rutas.put('/users/:userid', verificarToken, verificarEmail, (req,res) => {
     const datos = req.body;
     const username = datos.username;
     const email = datos.email;
-    if(!username || !email){
-        return res.status(400).send({message: 'El usuario y/o el email no pueden estar vacíos'});
+    const userid = req.params.userid;
+
+    if(!username || !email || !userid){
+        return res.status(400).send({message: 'El usuario, email y/o id no pueden estar vacíos'});
     };
 
-    let sql = `select * from usuarios where username = ?`;	
-    db.get(sql, [username], (err, row) => {
+    if(isNaN(userid)){
+        return res.status(400).send({message: "El usuarioId debe ser un numero"});
+    }
+    //La subconsulta la voy a usar para sacar el id del ususario que tenga el nombre de usuario
+    //especificado, en caso de que no lo tenga, entonces va a marcar "null", indicando que no está en uso
+    let sql = `select *, (select id from usuarios where username = ? and id != ?) usuarioId from usuarios where id = ?`;	
+    db.get(sql, [username, userid, userid], (err, row) => {
         if(err){
-            return res.status(500).send({message: 'Error al actualizar el usuario'});
+            return res.status(500).send({message: 'Error al seleccionar el usuario'});
         }
         if(!row){
             return res.status(400).send({message: 'El usuario no existe'});
-        }else{
-            sql = `update usuarios set email = ?, updatedAt = dateTime('now') where username = ?`;
-            db.run(sql, [email, username], (err) => {
+        }
+        if(row.usuarioId){
+            return res.status(400).send({message: "El nombre de usuario seleccionado ya existe"});
+        }
+        //Luego, valido que el email no exista para los demás usuarios
+        sql = "select * from usuarios where email = ? and id != ?";
+        db.all(sql, [email, userid], (err, rows) => {
+            if(err){
+                return res.status(500).send({message: "Error en el servidor", error: err});
+            }
+            if(rows.length > 0){
+                return res.status(400).send({message: "El correo especificado ya pertenece a otro usuario"});
+            }
+            //Finalmente actualizo los datos del usuario
+            sql = `update usuarios set email = ?, username = ?, updatedAt = dateTime('now') where id = ?`;
+            db.run(sql, [email, username, userid], (err) => {
                 if(err){
                     console.error(err.message);
                     return res.status(500).send({message: 'Error al actualizar el usuario'});
@@ -177,8 +197,8 @@ rutas.put('/users', verificarToken, verificarEmail, (req,res) => {
                 else{
                     return res.status(200).send({message: 'Usuario actualizado con éxito'});
                 }
-            });
-        }
+            }); 
+        });
     });
 })
 
@@ -188,16 +208,24 @@ rutas.delete('/users/:id', verificarToken, async(req, res) => {
     if(isNaN(id)){
         return res.status(400).send({message: 'El id debe ser un número'});
     }
-    let sql = `delete from usuarios where id = ?`;
-    db.run(sql, [id], (err, msg) => {
+    let sql = `select * from usuarios where id = ?`;
+    db.get(sql, [id], (err, row) => {
         if(err){
-            console.error(err.message);
-            return res.status(500).send({message: 'Error al eliminar el usuario'});
+            return res.status(500).send({message: "Error al consultar usuario", error: err});
         }
-        else{
-            return res.status(200).send({message: 'Usuario eliminado con éxito'});
+        if(row.length == 0){
+            return res.status(400).send({message: "El usuario que intenta eliminar no existe"});
         }
-    });
+        sql = `delete from usuarios where id = ?`;
+        db.run(sql, [id], (err) => {
+            if(err){
+                return res.status(500).send({message: 'Error al eliminar el usuario', error: err});
+            }
+            else{
+                return res.status(200).send({message: 'Usuario eliminado con éxito'});
+            }
+        });
+    })
 });
 
 module.exports = rutas;
